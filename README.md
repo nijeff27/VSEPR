@@ -3,7 +3,12 @@ Code repository for my research project, Developing a Computer Simulation For Es
 
 ### Running the Program
 Program is only tested on Linux.<br/>
-It is recommended to create a virtual environment via `venv` (`conda` can also work):
+First clone the repository:
+```sh
+git clone https://github.com/nijeff27/VSEPR.git
+cd VSEPR
+```
+It is suggested to create a virtual environment via `venv` (`conda` can also work):
 ```sh
 python -m venv .venv
 source .venv/bin/activate
