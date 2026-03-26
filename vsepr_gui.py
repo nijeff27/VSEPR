@@ -2,10 +2,10 @@ import threading
 import time
 
 import numpy as np
-import open3d as o3d
+import open3d.geometry as geometry
+import open3d.utility as utility
 import open3d.visualization.gui as gui
 import open3d.visualization.rendering as rendering
-from openpyxl import Workbook, load_workbook
 
 
 class VSEPR:
@@ -17,13 +17,6 @@ class VSEPR:
         self.logs_are_saved = False
         self.last_click_time = 0.0
         self.recentered = False
-
-        try:
-            self.wb = load_workbook('vsepr.xlsx')
-        except FileNotFoundError:
-            print('Workbook vsepr.py does not exist yet, creating...')
-            self.wb = Workbook()
-        self.ws = self.wb.active
 
         self.window = gui.Application.instance.create_window(
             'VSEPR Simulation', 1200, 700
@@ -61,12 +54,12 @@ class VSEPR:
 
         # TriangleMesh won't be rendered into actual solid face
         # And instead LineSet will be utilized to create a wireframe sphere (visual preference)
-        sphere_mesh = o3d.geometry.TriangleMesh.create_sphere(
+        sphere_mesh = geometry.TriangleMesh.create_sphere(
             radius=self.radius, resolution=20
         )
         sphere_mesh.compute_vertex_normals()
 
-        line_set = o3d.geometry.LineSet.create_from_triangle_mesh(sphere_mesh)
+        line_set = geometry.LineSet.create_from_triangle_mesh(sphere_mesh)
         lines = np.asarray(line_set.lines)
         lines_v_norms = np.asarray(sphere_mesh.vertex_normals)
 
@@ -83,7 +76,7 @@ class VSEPR:
             t = (float(np.dot(norm_mid, [0.0, 0.0, 1.0])) + 1.0) / 2.0
             line_colors.append([0.15 + 0.85 * t, 0.18 + 0.82 * t, 0.28 + 0.72 * t])
 
-        line_set.colors = o3d.utility.Vector3dVector(np.array(line_colors))
+        line_set.colors = utility.Vector3dVector(np.array(line_colors))
         self.wire_mesh = line_set
         self.base_mesh = sphere_mesh
         self.wire_material = rendering.MaterialRecord()
@@ -102,7 +95,7 @@ class VSEPR:
         )
 
         # Center of mass - used as a point of reference when the sphere is disabled
-        self.center_mesh = o3d.geometry.TriangleMesh.create_sphere(radius=0.03)
+        self.center_mesh = geometry.TriangleMesh.create_sphere(radius=0.03)
         self.center_mesh.compute_vertex_normals()
         self.center_mesh.paint_uniform_color([0.0, 0.6, 1.0])
         self.center_material = rendering.MaterialRecord()
@@ -171,7 +164,7 @@ class VSEPR:
         decay_row.add_child(self.decay_tb)
 
         self.run_button = gui.Button('Run')
-        self.run_button.set_on_clicked(self.on_run)
+        self.run_button.set_on_clicked(self.run)
         reset_btn = gui.Button('Reset Camera')
         reset_btn.set_on_clicked(self.recenter_camera)
         self.checkbox = gui.Checkbox('Show Sphere')
@@ -224,7 +217,7 @@ class VSEPR:
 
         # Then, re-add the updated points to GUI
         for i, (t, p) in enumerate(self.points):
-            mesh = o3d.geometry.TriangleMesh.create_sphere(radius=0.03)
+            mesh = geometry.TriangleMesh.create_sphere(radius=0.03)
             mesh.compute_vertex_normals()
             mesh.paint_uniform_color([0.4, 0.85, 1.0])
             self.scene_widget.scene.add_geometry(f'pt_{i}', mesh, self.point_material)
@@ -318,7 +311,7 @@ class VSEPR:
         self.info_label.text = "Press 'Show Info'..."
         self.logs_are_saved = False
 
-    def on_run(self):
+    def run(self):
         # User should not be able to run the program again during algorithm run
         self.run_button.enabled = False
 
@@ -327,7 +320,7 @@ class VSEPR:
         self.clear_info()
 
         # To be run on a separate thread
-        def annealing():
+        def find_points():
             start = time.time()
 
             n_p: int = self.num_points.int_value
@@ -429,7 +422,7 @@ class VSEPR:
 
             # Phase O
             # Gradient descent applied to all points
-            temp = temp_i / 2
+            temp = temp_i
             STEP = 0.1 / np.sqrt(n_p)
             total_steps += steps
             steps = 0
@@ -549,13 +542,11 @@ class VSEPR:
             total_steps += steps
             end = time.time()
 
-            # Log data into Excel worksheet
-            self.ws.append([n_p, best_e, end - start, total_steps])
-            self.wb.save('vsepr.xlsx')
+            # Print results to terminal console
             print([n_p, best_e, end - start, total_steps])
 
         # Run the optimization loop in a separate thread to keep the GUI from freezing
-        threading.Thread(target=annealing, daemon=True).start()
+        threading.Thread(target=find_points, daemon=True).start()
 
     def calc_dist_arr(self, pts: np.ndarray):
         t = pts[:, 0]
