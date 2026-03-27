@@ -2,13 +2,14 @@
 Command-line interface for generating VSEPR configurations. Uses little GPU and can run multiple processes at once.
 """
 
-import threading
+import json
 import time
+from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
 
 RNG = np.random.default_rng()
-LONE_CONSTANT = 1
+LONE_CONSTANT = 1.23257467
 
 
 def gen_points(amt: int):
@@ -32,43 +33,42 @@ def find_points(
     bonded_points_arr: np.ndarray = None,
     lone_points_arr: np.ndarray = None,
 ):
-    bonded_points = gen_points(bonded_p)
-    lone_points = gen_points(lone_p)
-
     total_p = bonded_p + lone_p
-    start = time.time()
-    temp_i = temp
+
+    # Take the first bonded_p points to be the points that are "bonded" and the last lone_p points to be "lone" points
+    points = gen_points(total_p)
 
     STEP = 0.3 / np.sqrt(total_p)
     NOISE_AMP = 0.1 / np.sqrt(total_p)
     NOISE_AMT = (total_p // 5) + 1
 
+    temp_i = temp * np.sqrt(total_p)
     best_e = float('inf')
-    best_pts: np.ndarray = []
-    curr_e = calc_energy_state(bonded_points, lone_points)
+    best_pts: np.ndarray = points.copy()
+    curr_e = calc_energy_state(points, bonded_p)
     total_steps = 0
     steps = 0
     accepted = 0
 
+    start = time.time()
     # Phase A
     # Utilizing simulated annealing to work towards global minimum
     # See https://cp-algorithms.com/num_methods/simulated_annealing.html
     while temp > temp_min:
-        pts = self.points.copy()
-        grad = self.calc_grad_arr(pts)
+        grad = calc_grad_arr(points, bonded_p)
 
         # We want to attempt to apply the negative gradient AND some noise (in around 1/5 of points) to the
         # current configuration, then check if it will accept using the PAF (probability acceptance function).
-        next_pts = pts - STEP * grad
+        next_pts = points - STEP * grad
 
-        noise_i = np.random.choice(n_p, NOISE_AMT, replace=False)
-        noise = self.gen_points(NOISE_AMT)
+        noise_i = np.random.choice(total_p, NOISE_AMT, replace=False)
+        noise = gen_points(NOISE_AMT)
         next_pts[noise_i] += NOISE_AMP * (temp / temp_i) * noise
 
-        next_e = self.calc_energy_state(next_pts)
+        next_e = calc_energy_state(next_pts, bonded_p)
 
-        if self.paf(curr_e, next_e, temp):
-            self.points = next_pts
+        if paf(curr_e, next_e, temp):
+            points = next_pts
             curr_e = next_e
             accepted += 1
 
@@ -88,41 +88,27 @@ def find_points(
                 STEP *= 0.9
 
             # But step can't be too high or low...
-            STEP = np.clip(STEP, 1e-4 / np.sqrt(n_p), 1.0 / np.sqrt(n_p))
+            STEP = np.clip(STEP, 1e-4 / np.sqrt(total_p), 1.0 / np.sqrt(total_p))
             accepted = 0
 
-        if steps % UPDATE_INTERVAL == 0:
-            gui.Application.instance.post_to_main_thread(
-                self.window, self.update_point_meshes
-            )
-            gui.Application.instance.post_to_main_thread(
-                self.window,
-                lambda t=temp, e=curr_e, s=steps: self.log_info(
-                    f'[A] Step {s}: T = {t:.6f} E = {e:.6f}'
-                ),
-            )
-
-    self.points = best_pts
-    gui.Application.instance.post_to_main_thread(self.window, self.update_point_meshes)
+    # The program can explore higher-energy point configs, make sure to reset to the best known configuration
+    points = best_pts
 
     # Phase O
     # Gradient descent applied to all points
     temp = temp_i
-    STEP = 0.1 / np.sqrt(n_p)
+    STEP = 0.1 / np.sqrt(total_p)
     total_steps += steps
     steps = 0
     accepted = 0
 
     while temp > temp_min:
-        pts = self.points.copy()
-        grad = self.calc_grad_arr(pts)
-
-        next_pts = pts - STEP * grad
-
-        next_e = self.calc_energy_state(next_pts)
+        grad = calc_grad_arr(points, bonded_p)
+        next_pts = points - STEP * grad
+        next_e = calc_energy_state(next_pts, bonded_p)
 
         if next_e < best_e:
-            self.points = next_pts
+            points = next_pts
             best_e = next_e
             accepted += 1
 
@@ -138,46 +124,36 @@ def find_points(
                 STEP *= 0.9
 
             # But step can't be too high or low...
-            STEP = np.clip(STEP, 1e-5 / np.sqrt(n_p), 0.5 / np.sqrt(n_p))
+            STEP = np.clip(STEP, 1e-5 / np.sqrt(total_p), 0.5 / np.sqrt(total_p))
             accepted = 0
-
-        if steps % UPDATE_INTERVAL == 0:
-            gui.Application.instance.post_to_main_thread(
-                self.window, self.update_point_meshes
-            )
-            gui.Application.instance.post_to_main_thread(
-                self.window,
-                lambda t=temp, e=best_e, s=steps: self.log_info(
-                    f'[R] Step {s}: T = {t:.6f} E = {e:.6f}'
-                ),
-            )
 
     # Phase R
     # Negative gradient applied to one point only to further refine energy level
     temp = temp_i
-    STEP = 0.05 / np.sqrt(n_p)
+    STEP = 0.05 / np.sqrt(total_p)
     total_steps += steps
     steps = 0
     accepted = 0
 
     # First calculate the distance array once, then update the array incrementally to keep a O(n) complexity
-    dist_arr = self.calc_dist_arr(self.points)
+    dist_arr = calc_dist_arr(points)
 
     while temp > temp_min:
-        i = np.random.randint(n_p)
+        i = np.random.randint(total_p)
+        w = weights_row(bonded_p, total_p, i)
 
         old_dist = dist_arr[i, :].copy()
-        grad = self.calc_grad_row(self.points, old_dist, i)
+        grad = calc_grad_row(points, bonded_p, old_dist, i, w)
 
-        old_pts = self.points[i, :].copy()
-        self.points[i, 0] = self.points[i, 0] - STEP * grad[0]
-        self.points[i, 1] = self.points[i, 1] - STEP * grad[1]
+        old_pts = points[i, :].copy()
+        points[i, 0] = points[i, 0] - STEP * grad[0]
+        points[i, 1] = points[i, 1] - STEP * grad[1]
 
         # Instead of calculating the total energy of the system, calculate only the energy potential of
         # the old set of points and the new set of points, and compare those potentials
-        new_dist = self.calc_dist_row(self.points, i)
-        old_energy = np.sum(1.0 / old_dist[old_dist > 0])
-        new_energy = np.sum(1.0 / new_dist[new_dist > 0])
+        new_dist = calc_dist_row(points, i)
+        old_energy = np.sum(w[old_dist > 0] / old_dist[old_dist > 0])
+        new_energy = np.sum(w[new_dist > 0] / new_dist[new_dist > 0])
         next_e = best_e - old_energy + new_energy
 
         if next_e < best_e:
@@ -188,7 +164,7 @@ def find_points(
             dist_arr[:, i] = new_dist
         else:
             # Revert the previous change
-            self.points[i, :] = old_pts
+            points[i, :] = old_pts
 
         temp *= decay
         steps += 1
@@ -202,43 +178,49 @@ def find_points(
                 STEP *= 0.9
 
             # But step can't be too high or low...
-            STEP = np.clip(STEP, 1e-5 / np.sqrt(n_p), 0.5 / np.sqrt(n_p))
+            STEP = np.clip(STEP, 1e-5 / np.sqrt(total_p), 0.5 / np.sqrt(total_p))
             accepted = 0
-
-        if steps % UPDATE_INTERVAL == 0:
-            gui.Application.instance.post_to_main_thread(
-                self.window, self.update_point_meshes
-            )
-            gui.Application.instance.post_to_main_thread(
-                self.window,
-                lambda t=temp, e=best_e, s=steps: self.log_info(
-                    f'[O] Step {s}: T = {t:.6f} E = {e:.6f}'
-                ),
-            )
-
-    gui.Application.instance.post_to_main_thread(
-        self.window,
-        lambda: self.log_info(f'Done in {steps} steps. Best E={best_e:.6f}'),
-    )
-    gui.Application.instance.post_to_main_thread(
-        self.window, lambda: setattr(self.run_button, 'enabled', True)
-    )
 
     total_steps += steps
     end = time.time()
 
     # Print results to terminal console
-    print([n_p, best_e, end - start, total_steps])
+    print([total_p, best_e, end - start, total_steps])
+    return (best_e, points)
 
 
-def run():
-    # To be run on a separate thread
-    # Run the optimization loop in a separate thread to keep the GUI from freezing
-    threading.Thread(target=annealing, daemon=True).start()
+def run(bonded_p: int, lone_p: int, temp: float, decay: float, runs: int = 10):
+    with ProcessPoolExecutor(max_workers=runs) as executor:
+        procs = [
+            executor.submit(find_points, bonded_p, lone_p, temp, decay=decay)
+            for _ in range(runs)
+        ]
+        results = [p.result() for p in procs]
+
+    output = {
+        'bonded_points': bonded_p,
+        'lone_points': lone_p,
+        'runs': [
+            {
+                'energy': energy,
+                'points': [
+                    {'type': 'bonded' if i < bonded_p else 'lone', 'theta': t, 'phi': p}
+                    for i, (t, p) in enumerate(pts)
+                ],
+            }
+            for (energy, pts) in results
+        ],
+    }
+
+    filename = 'data/result_vsepr_cli.json'
+    with open(filename, 'r+') as f:
+        data = json.load(f)
+        data.append(output)
+        f.seek(0)
+        json.dump(data, f, indent=4)
 
 
-def calc_dist_arr(bonded_pts: np.ndarray, lone_pts: np.ndarray):
-    pts = np.concat([bonded_pts, lone_pts], axis=0)
+def calc_dist_arr(pts: np.ndarray):
     t = pts[:, 0]
     p = pts[:, 1]
     dt = t[:, np.newaxis] - t[np.newaxis, :]
@@ -254,14 +236,13 @@ def calc_dist_arr(bonded_pts: np.ndarray, lone_pts: np.ndarray):
     return np.sqrt(np.clip(dist_sq, 0, None))
 
 
-def calc_grad_arr(bonded_pts: np.ndarray, lone_pts: np.ndarray) -> np.ndarray:
-    pts: np.ndarray = np.concat(bonded_pts, lone_pts, axis=0)
+def calc_grad_arr(pts: np.ndarray, bonded_points: int) -> np.ndarray:
     t = pts[:, 0]
     p = pts[:, 1]
     dt = t[:, np.newaxis] - t[np.newaxis, :]
-    weight = weights(bonded_pts, lone_pts)
+    weight = weights(pts, bonded_points)
 
-    den = np.clip(calc_dist_arr(pts), 0, None) ** 1.5
+    den = calc_dist_arr(pts) ** 1.5
     with np.errstate(divide='ignore', invalid='ignore'):
         inv_den = np.where(den > 0, 1.0 / den, 0.0)
 
@@ -285,11 +266,11 @@ def calc_grad_arr(bonded_pts: np.ndarray, lone_pts: np.ndarray) -> np.ndarray:
     return np.column_stack([d_t, d_p])
 
 
-def calc_energy_state(bonded_pts: np.ndarray, lone_pts: np.ndarray) -> np.double:
+def calc_energy_state(pts: np.ndarray, bonded_points: int) -> np.double:
     # Only need the upper triangle of matrix so distances aren't counted duplicate
     # Where i < j, dist_arr[i][j] is kept
-    dist = calc_dist_arr(bonded_pts, lone_pts)
-    weight = weights(bonded_pts, lone_pts)
+    dist = calc_dist_arr(pts)
+    weight = weights(pts, bonded_points)
     upper_mask = np.triu(dist > 0, k=1)
 
     # Divide the upper array by the lone pair energy constants (if there are lone pairs)
@@ -298,8 +279,7 @@ def calc_energy_state(bonded_pts: np.ndarray, lone_pts: np.ndarray) -> np.double
     return np.sum(weight[upper_mask] / dist[upper_mask])
 
 
-def calc_dist_row(bonded_pts: np.ndarray, lone_pts: np.ndarray, i: int):
-    pts: np.ndarray = np.concat(bonded_pts, lone_pts, axis=0)
+def calc_dist_row(pts: np.ndarray, i: int):
     t_i, p_i = pts[i, 0], pts[i, 1]
     dt = t_i - pts[:, 0]
 
@@ -316,9 +296,12 @@ def calc_dist_row(bonded_pts: np.ndarray, lone_pts: np.ndarray, i: int):
 
 
 def calc_grad_row(
-    bonded_pts: np.ndarray, lone_pts: np.ndarray, dist_row: np.ndarray, i: int
+    pts: np.ndarray,
+    bonded_points: int,
+    dist_row: np.ndarray,
+    i: int,
+    weight: np.ndarray,
 ):
-    pts: np.ndarray = np.concat(bonded_pts, lone_pts, axis=0)
     t_i, p_i = pts[i, 0], pts[i, 1]
     dt = t_i - pts[:, 0]
     den = dist_row**3
@@ -326,16 +309,33 @@ def calc_grad_row(
     with np.errstate(divide='ignore', invalid='ignore'):
         inv_den = np.where(den > 0, 1.0 / den, 0.0)
 
-    d_t = np.sum(-np.sin(p_i) * np.sin(pts[:, 1]) * np.sin(dt) * inv_den)
+    d_t = np.sum(-np.sin(p_i) * np.sin(pts[:, 1]) * np.sin(dt) * inv_den * weight)
     d_p = np.sum(
         (np.cos(p_i) * np.sin(pts[:, 1]) * np.cos(dt) - np.sin(p_i) * np.cos(pts[:, 1]))
         * inv_den
+        * weight
     )
 
     return np.array([d_t, d_p])
 
 
-def paf(self, e: float, e_n: float, t: int) -> bool:
+def weights(pts: np.ndarray, bonded_points: int) -> np.ndarray:
+    dim = pts.shape[0]
+    weight = np.ones((dim, dim))
+    weight[bonded_points:, :] *= LONE_CONSTANT
+    weight[:, bonded_points:] *= LONE_CONSTANT
+    return weight
+
+
+def weights_row(bonded_points: int, total: int, i: int) -> np.ndarray:
+    weight = np.ones(total)
+    weight[bonded_points:] *= LONE_CONSTANT
+    if i >= bonded_points:
+        weight *= LONE_CONSTANT
+    return weight
+
+
+def paf(e: float, e_n: float, t: int) -> bool:
     if e_n < e:
         return True
 
@@ -343,13 +343,23 @@ def paf(self, e: float, e_n: float, t: int) -> bool:
 
 
 if __name__ == '__main__':
-    pass
+    # parser = argparse.ArgumentParser(
+    #     prog='VSEPR_cli', description='Calculates values for VSEPR configurations.'
+    # )
+    # parser.add_argument('bonded', type=int, help='Number of bonded points')
+    # parser.add_argument('lone', type=int, help='Number of lone points')
+    # parser.add_argument(
+    #     '--temp', type=float, default=10000, help='Initial temperature [default: 10000]'
+    # )
+    # parser.add_argument(
+    #     '--decay', type=float, default=0.999, help='Decay [default: 0.999]'
+    # )
 
+    # args = parser.parse_args()
+    # run(args.bonded, args.lone, args.temp)
 
-def weights(bonded_pts: np.ndarray, lone_pts: np.ndarray) -> np.ndarray:
-    total = bonded_pts.shape[0] + lone_pts.shape[0]
-    bonded_total = bonded_pts.shape[0]
-    weight = np.ones((total, total))
-    weight[bonded_total:, :] *= LONE_CONSTANT
-    weight[:, bonded_total:] *= LONE_CONSTANT
-    return weight
+    for i in range(2, 50):
+        run(i, 0, temp=10000, decay=0.999)
+
+    for i in range(3, 50):
+        run(i - 2, 2, temp=10000, decay=0.999)

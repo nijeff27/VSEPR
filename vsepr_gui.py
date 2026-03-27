@@ -7,11 +7,143 @@ import open3d.utility as utility
 import open3d.visualization.gui as gui
 import open3d.visualization.rendering as rendering
 
+LONE_CONSTANT = 1.23257467
+
+
+def gen_points(amt: int):
+    # Generate points in rectangular coordinates to prevent point clustering caused by spherical coordinates
+    rng = np.random.default_rng()
+    pts_rect = rng.uniform(-1.0, 1.0, (amt, 3))
+    pts_rect = pts_rect / np.linalg.norm(pts_rect, axis=1, keepdims=True)
+
+    # Now convert those coordinates to spherical coordinates (theta, phi)
+    t = np.arctan2(pts_rect[:, 1], pts_rect[:, 0])
+    p = np.arccos(np.clip(pts_rect[:, 2], -1, 1))
+
+    return np.column_stack([t, p])
+
+
+def calc_dist_arr(pts: np.ndarray):
+    t = pts[:, 0]
+    p = pts[:, 1]
+    dt = t[:, np.newaxis] - t[np.newaxis, :]
+
+    dist_sq = (
+        2
+        - 2 * np.sin(p[:, np.newaxis]) * np.sin(p[np.newaxis, :]) * np.cos(dt)
+        - 2 * np.cos(p[:, np.newaxis]) * np.cos(p[np.newaxis, :])
+    )
+
+    # Ensure same distance to same points (the diagonal) is 0
+    np.fill_diagonal(dist_sq, 0)
+    return np.sqrt(np.clip(dist_sq, 0, None))
+
+
+def calc_grad_arr(pts: np.ndarray, bonded_points: int) -> np.ndarray:
+    t = pts[:, 0]
+    p = pts[:, 1]
+    dt = t[:, np.newaxis] - t[np.newaxis, :]
+    weight = weights(pts, bonded_points)
+
+    den = calc_dist_arr(pts) ** 1.5
+    with np.errstate(divide='ignore', invalid='ignore'):
+        inv_den = np.where(den > 0, 1.0 / den, 0.0)
+
+    # Partial derivatives per point
+    d_t = np.sum(
+        (-np.sin(p[:, np.newaxis]) * np.sin(p[np.newaxis, :]) * np.sin(dt))
+        * inv_den
+        * weight,
+        axis=1,
+    )
+    d_p = np.sum(
+        (
+            np.cos(p[:, np.newaxis]) * np.sin(p[np.newaxis, :]) * np.cos(dt)
+            - np.sin(p[:, np.newaxis]) * np.cos(p[np.newaxis, :])
+        )
+        * inv_den
+        * weight,
+        axis=1,
+    )
+
+    return np.column_stack([d_t, d_p])
+
+
+def calc_energy_state(pts: np.ndarray, bonded_points: int) -> np.double:
+    # Only need the upper triangle of matrix so distances aren't counted duplicate
+    # Where i < j, dist_arr[i][j] is kept
+    dist = calc_dist_arr(pts)
+    weight = weights(pts, bonded_points)
+    upper_mask = np.triu(dist > 0, k=1)
+    return np.sum(weight[upper_mask] / dist[upper_mask])
+
+
+def calc_dist_row(pts: np.ndarray, i: int):
+    t_i, p_i = pts[i, 0], pts[i, 1]
+    dt = t_i - pts[:, 0]
+
+    dist_sq = (
+        2
+        - 2 * np.sin(p_i) * np.sin(pts[:, 1]) * np.cos(dt)
+        - 2 * np.cos(p_i) * np.cos(pts[:, 1])
+    )
+
+    # Set the distance to the same point (i) 0
+    dist_sq[i] = 0
+
+    return np.sqrt(np.clip(dist_sq, 0, None))
+
+
+def calc_grad_row(
+    pts: np.ndarray,
+    bonded_points: int,
+    dist_row: np.ndarray,
+    i: int,
+    weight: np.ndarray,
+):
+    t_i, p_i = pts[i, 0], pts[i, 1]
+    dt = t_i - pts[:, 0]
+    den = dist_row**3
+
+    with np.errstate(divide='ignore', invalid='ignore'):
+        inv_den = np.where(den > 0, 1.0 / den, 0.0)
+
+    d_t = np.sum(-np.sin(p_i) * np.sin(pts[:, 1]) * np.sin(dt) * inv_den * weight)
+    d_p = np.sum(
+        (np.cos(p_i) * np.sin(pts[:, 1]) * np.cos(dt) - np.sin(p_i) * np.cos(pts[:, 1]))
+        * inv_den
+        * weight
+    )
+
+    return np.array([d_t, d_p])
+
+
+def weights(pts: np.ndarray, bonded_points: int) -> np.ndarray:
+    dim = pts.shape[0]
+    weight = np.ones((dim, dim))
+    weight[bonded_points:, :] *= LONE_CONSTANT
+    weight[:, bonded_points:] *= LONE_CONSTANT
+    return weight
+
+
+def weights_row(bonded_points: int, total: int, i: int) -> np.ndarray:
+    weight = np.ones(total)
+    weight[bonded_points:] *= LONE_CONSTANT
+    if i >= bonded_points:
+        weight *= LONE_CONSTANT
+    return weight
+
+
+def paf(e: float, e_n: float, t: int) -> bool:
+    if e_n < e:
+        return True
+
+    return np.random.random() <= np.exp((e - e_n) / t)
+
 
 class VSEPR:
     def __init__(self):
         self.radius = 1.0
-        self.rng = np.random.default_rng()
         self.points: np.ndarray = []
         self.info_lines: list[str] = []
         self.logs_are_saved = False
@@ -108,7 +240,7 @@ class VSEPR:
         # Points (electrons), rendered as small spheres like the center of mass
         self.point_meshes = []
         self.point_material = rendering.MaterialRecord()
-        self.point_material.shader = 'defaultUnlit'
+        self.point_material.shader = 'defaultLit'
         self.point_material.base_color = [0.4, 0.85, 1.0, 1.0]
 
         self._bounds = sphere_mesh.get_axis_aligned_bounding_box()
@@ -120,48 +252,44 @@ class VSEPR:
     def inputs(self):
         # Right-hand side of GUI
         # All sliders are accompanied with textboxes for both drag and type input
-        num_points_row = gui.Horiz(5)
-        self.num_points = gui.Slider(gui.Slider.INT)
-        self.num_points.set_limits(2, 200)
-        self.num_points.int_value = 2
-        self.num_points_txt = gui.NumberEdit(gui.NumberEdit.INT)
-        self.num_points_txt.set_limits(2, 200)
-        self.num_points_txt.set_value(2)
-        self.num_points.set_on_value_changed(self.num_points_txt.set_value)
-        self.num_points_txt.set_on_value_changed(
-            lambda val: setattr(self.num_points, 'int_value', int(val))
-        )
-        num_points_row.add_child(self.num_points)
-        num_points_row.add_child(self.num_points_txt)
 
-        temp_row = gui.Horiz(5)
-        self.temperature = gui.Slider(gui.Slider.INT)
-        self.temperature.set_limits(1000, 20000)
-        self.temperature.int_value = 5000
-        self.temperature_txt = gui.NumberEdit(gui.NumberEdit.INT)
-        self.temperature_txt.set_limits(1000, 20000)
-        self.temperature_txt.set_value(5000)
-        self.temperature.set_on_value_changed(self.temperature_txt.set_value)
-        self.temperature_txt.set_on_value_changed(
-            lambda val: setattr(self.temperature, 'int_value', int(val))
-        )
-        temp_row.add_child(self.temperature)
-        temp_row.add_child(self.temperature_txt)
+        def make_int_row(lo, hi, default):
+            row = gui.Horiz(5)
+            slider = gui.Slider(gui.Slider.INT)
+            slider.set_limits(lo, hi)
+            slider.int_value = default
+            txt = gui.NumberEdit(gui.NumberEdit.INT)
+            txt.set_limits(lo, hi)
+            txt.set_value(default)
+            slider.set_on_value_changed(txt.set_value)
+            txt.set_on_value_changed(
+                lambda val, s=slider: setattr(s, 'int_value', int(val))
+            )
+            row.add_child(slider)
+            row.add_child(txt)
+            return row, slider
 
-        decay_row = gui.Horiz(5)
-        self.decay = gui.Slider(gui.Slider.DOUBLE)
-        self.decay.set_limits(0.5, 0.999)
-        self.decay.double_value = 0.998
-        self.decay_tb = gui.NumberEdit(gui.NumberEdit.DOUBLE)
-        self.decay_tb.set_limits(0.5, 0.999)
-        self.decay_tb.set_value(0.998)
-        self.decay_tb.decimal_precision = 3
-        self.decay.set_on_value_changed(self.decay_tb.set_value)
-        self.decay_tb.set_on_value_changed(
-            lambda val: setattr(self.decay, 'double_value', np.double(val))
-        )
-        decay_row.add_child(self.decay)
-        decay_row.add_child(self.decay_tb)
+        def make_double_row(lo, hi, default, precision=3):
+            row = gui.Horiz(5)
+            slider = gui.Slider(gui.Slider.DOUBLE)
+            slider.set_limits(lo, hi)
+            slider.double_value = default
+            txt = gui.NumberEdit(gui.NumberEdit.DOUBLE)
+            txt.set_limits(lo, hi)
+            txt.set_value(default)
+            txt.decimal_precision = precision
+            slider.set_on_value_changed(txt.set_value)
+            txt.set_on_value_changed(
+                lambda val, s=slider: setattr(s, 'double_value', np.double(val))
+            )
+            row.add_child(slider)
+            row.add_child(txt)
+            return row, slider
+
+        bonded_row, self.bonded_points = make_int_row(2, 200, 2)
+        lone_row, self.lone_points = make_int_row(0, 50, 0)
+        temp_row, self.temperature = make_int_row(1000, 20000, 5000)
+        decay_row, self.decay = make_double_row(0.5, 0.999, 0.998)
 
         self.run_button = gui.Button('Run')
         self.run_button.set_on_clicked(self.run)
@@ -181,8 +309,10 @@ class VSEPR:
         for el in [
             gui.Label('Generation Settings'),
             gui.Label(''),
-            gui.Label('Number of particles'),
-            num_points_row,
+            gui.Label('Bonded pairs'),
+            bonded_row,
+            gui.Label('Lone pairs'),
+            lone_row,
             gui.Label('Temperature'),
             temp_row,
             gui.Label('Decay (alpha)'),
@@ -198,17 +328,6 @@ class VSEPR:
         ]:
             self.panel.add_child(el)
 
-    def gen_points(self, amt: int):
-        # Generate points in rectangular coordinates to prevent point clustering caused by spherical coordinates
-        pts_rect = self.rng.uniform(-1.0, 1.0, (amt, 3))
-        pts_rect = pts_rect / np.linalg.norm(pts_rect, axis=1, keepdims=True)
-
-        # Now convert those coordinates to spherical coordinates (theta, phi)
-        t = np.arctan2(pts_rect[:, 1], pts_rect[:, 0])
-        p = np.arccos(np.clip(pts_rect[:, 2], -1, 1))
-
-        return np.column_stack([t, p])
-
     def init_point_meshes(self):
         # Remove the existing rendered points
         for i in range(len(self.point_meshes)):
@@ -219,7 +338,12 @@ class VSEPR:
         for i, (t, p) in enumerate(self.points):
             mesh = geometry.TriangleMesh.create_sphere(radius=0.03)
             mesh.compute_vertex_normals()
-            mesh.paint_uniform_color([0.4, 0.85, 1.0])
+            # Different color based on bonded/lone pair
+            mesh.paint_uniform_color(
+                [0.4, 0.85, 1.0]
+                if i < self.bonded_points.int_value
+                else [1.0, 0.6, 0.1]
+            )
             self.scene_widget.scene.add_geometry(f'pt_{i}', mesh, self.point_material)
             self.point_meshes.append(mesh)
 
@@ -323,33 +447,35 @@ class VSEPR:
         def find_points():
             start = time.time()
 
-            n_p: int = self.num_points.int_value
-            temp: float = self.temperature.int_value * n_p
+            bonded_p: int = self.bonded_points.int_value
+            lone_p: int = self.lone_points.int_value
+            total_p: int = bonded_p + lone_p
+            temp: float = self.temperature.int_value * total_p
             temp_i = temp
             temp_min: float = 0.0001
             decay: np.double = self.decay.double_value
 
             gui.Application.instance.post_to_main_thread(
                 self.window,
-                lambda n=n_p, t=temp, d=decay: self.log_info(
-                    f'Points:\t\t\t{n}',
+                lambda b=bonded_p, l=lone_p, t=temp, d=decay: self.log_info(
+                    f'Bonded:\t\t\t{b}',
+                    f'Lone:\t\t\t{l}',
                     f'Temperature:\t{t}',
                     f'Decay:\t\t\t{d}',
                 ),
             )
 
-            STEP = 0.3 / np.sqrt(n_p)
-            NOISE_AMP = 0.1 / np.sqrt(n_p)
-            NOISE_AMT = (n_p // 5) + 1
-            UPDATE_INTERVAL = max(500, n_p * 10)
+            STEP = 0.3 / np.sqrt(total_p)
+            NOISE_AMP = 0.1 / np.sqrt(total_p)
+            NOISE_AMT = (total_p // 5) + 1
+            UPDATE_INTERVAL = max(500, total_p * 10)
 
             pts_ready = threading.Event()
 
             def set_points():
-                self.points = self.gen_points(n_p)
+                self.points = gen_points(total_p)
                 self.init_point_meshes()
                 self.update_point_meshes()
-
                 pts_ready.set()
 
             # Add random particles as a starting point
@@ -357,8 +483,8 @@ class VSEPR:
             pts_ready.wait()
 
             best_e = float('inf')
-            best_pts: np.ndarray = []
-            curr_e = self.calc_energy_state(self.points)
+            best_pts: np.ndarray = self.points.copy()
+            curr_e = calc_energy_state(self.points, bonded_p)
             total_steps = 0
             steps = 0
             accepted = 0
@@ -368,19 +494,19 @@ class VSEPR:
             # See https://cp-algorithms.com/num_methods/simulated_annealing.html
             while temp > temp_min:
                 pts = self.points.copy()
-                grad = self.calc_grad_arr(pts)
+                grad = calc_grad_arr(pts, bonded_p)
 
                 # We want to attempt to apply the negative gradient AND some noise (in around 1/5 of points) to the
                 # current configuration, then check if it will accept using the PAF (probability acceptance function).
                 next_pts = pts - STEP * grad
 
-                noise_i = np.random.choice(n_p, NOISE_AMT, replace=False)
-                noise = self.gen_points(NOISE_AMT)
+                noise_i = np.random.choice(total_p, NOISE_AMT, replace=False)
+                noise = gen_points(NOISE_AMT)
                 next_pts[noise_i] += NOISE_AMP * (temp / temp_i) * noise
 
-                next_e = self.calc_energy_state(next_pts)
+                next_e = calc_energy_state(next_pts, bonded_p)
 
-                if self.paf(curr_e, next_e, temp):
+                if paf(curr_e, next_e, temp):
                     self.points = next_pts
                     curr_e = next_e
                     accepted += 1
@@ -401,7 +527,9 @@ class VSEPR:
                         STEP *= 0.9
 
                     # But step can't be too high or low...
-                    STEP = np.clip(STEP, 1e-4 / np.sqrt(n_p), 1.0 / np.sqrt(n_p))
+                    STEP = np.clip(
+                        STEP, 1e-4 / np.sqrt(total_p), 1.0 / np.sqrt(total_p)
+                    )
                     accepted = 0
 
                 if steps % UPDATE_INTERVAL == 0:
@@ -423,18 +551,16 @@ class VSEPR:
             # Phase O
             # Gradient descent applied to all points
             temp = temp_i
-            STEP = 0.1 / np.sqrt(n_p)
+            STEP = 0.1 / np.sqrt(total_p)
             total_steps += steps
             steps = 0
             accepted = 0
 
             while temp > temp_min:
                 pts = self.points.copy()
-                grad = self.calc_grad_arr(pts)
-
+                grad = calc_grad_arr(pts, bonded_p)
                 next_pts = pts - STEP * grad
-
-                next_e = self.calc_energy_state(next_pts)
+                next_e = calc_energy_state(next_pts, bonded_p)
 
                 if next_e < best_e:
                     self.points = next_pts
@@ -453,7 +579,9 @@ class VSEPR:
                         STEP *= 0.9
 
                     # But step can't be too high or low...
-                    STEP = np.clip(STEP, 1e-5 / np.sqrt(n_p), 0.5 / np.sqrt(n_p))
+                    STEP = np.clip(
+                        STEP, 1e-5 / np.sqrt(total_p), 0.5 / np.sqrt(total_p)
+                    )
                     accepted = 0
 
                 if steps % UPDATE_INTERVAL == 0:
@@ -463,26 +591,27 @@ class VSEPR:
                     gui.Application.instance.post_to_main_thread(
                         self.window,
                         lambda t=temp, e=best_e, s=steps: self.log_info(
-                            f'[R] Step {s}: T = {t:.6f} E = {e:.6f}'
+                            f'[O] Step {s}: T = {t:.6f} E = {e:.6f}'
                         ),
                     )
 
             # Phase R
             # Negative gradient applied to one point only to further refine energy level
             temp = temp_i
-            STEP = 0.05 / np.sqrt(n_p)
+            STEP = 0.05 / np.sqrt(total_p)
             total_steps += steps
             steps = 0
             accepted = 0
 
             # First calculate the distance array once, then update the array incrementally to keep a O(n) complexity
-            dist_arr = self.calc_dist_arr(self.points)
+            dist_arr = calc_dist_arr(self.points)
 
             while temp > temp_min:
-                i = np.random.randint(n_p)
+                i = np.random.randint(total_p)
+                w = weights_row(bonded_p, total_p, i)
 
                 old_dist = dist_arr[i, :].copy()
-                grad = self.calc_grad_row(self.points, old_dist, i)
+                grad = calc_grad_row(self.points, bonded_p, old_dist, i, w)
 
                 old_pts = self.points[i, :].copy()
                 self.points[i, 0] = self.points[i, 0] - STEP * grad[0]
@@ -490,9 +619,9 @@ class VSEPR:
 
                 # Instead of calculating the total energy of the system, calculate only the energy potential of
                 # the old set of points and the new set of points, and compare those potentials
-                new_dist = self.calc_dist_row(self.points, i)
-                old_energy = np.sum(1.0 / old_dist[old_dist > 0])
-                new_energy = np.sum(1.0 / new_dist[new_dist > 0])
+                new_dist = calc_dist_row(self.points, i)
+                old_energy = np.sum(w[old_dist > 0] / old_dist[old_dist > 0])
+                new_energy = np.sum(w[new_dist > 0] / new_dist[new_dist > 0])
                 next_e = best_e - old_energy + new_energy
 
                 if next_e < best_e:
@@ -517,7 +646,9 @@ class VSEPR:
                         STEP *= 0.9
 
                     # But step can't be too high or low...
-                    STEP = np.clip(STEP, 1e-5 / np.sqrt(n_p), 0.5 / np.sqrt(n_p))
+                    STEP = np.clip(
+                        STEP, 1e-5 / np.sqrt(total_p), 0.5 / np.sqrt(total_p)
+                    )
                     accepted = 0
 
                 if steps % UPDATE_INTERVAL == 0:
@@ -527,7 +658,7 @@ class VSEPR:
                     gui.Application.instance.post_to_main_thread(
                         self.window,
                         lambda t=temp, e=best_e, s=steps: self.log_info(
-                            f'[O] Step {s}: T = {t:.6f} E = {e:.6f}'
+                            f'[R] Step {s}: T = {t:.6f} E = {e:.6f}'
                         ),
                     )
 
@@ -543,110 +674,10 @@ class VSEPR:
             end = time.time()
 
             # Print results to terminal console
-            print([n_p, best_e, end - start, total_steps])
+            print([total_p, best_e, end - start, total_steps])
 
         # Run the optimization loop in a separate thread to keep the GUI from freezing
         threading.Thread(target=find_points, daemon=True).start()
-
-    def calc_dist_arr(self, pts: np.ndarray):
-        t = pts[:, 0]
-        p = pts[:, 1]
-        dt = t[:, np.newaxis] - t[np.newaxis, :]
-
-        dist_sq = (
-            2
-            - 2 * np.sin(p[:, np.newaxis]) * np.sin(p[np.newaxis, :]) * np.cos(dt)
-            - 2 * np.cos(p[:, np.newaxis]) * np.cos(p[np.newaxis, :])
-        )
-
-        # Ensure same distance to same points (the diagonal) is 0
-        np.fill_diagonal(dist_sq, 0)
-        return np.sqrt(np.clip(dist_sq, 0, None))
-
-    def calc_grad_arr(self, pts: np.ndarray) -> np.ndarray:
-        t = pts[:, 0]
-        p = pts[:, 1]
-        dt = t[:, np.newaxis] - t[np.newaxis, :]
-
-        den = np.clip(self.calc_dist_arr(pts), 0, None) ** 1.5
-        with np.errstate(divide='ignore', invalid='ignore'):
-            inv_den = np.where(den > 0, 1.0 / den, 0.0)
-
-        # Partial derivatives per point
-        d_t = np.sum(
-            (-np.sin(p[:, np.newaxis]) * np.sin(p[np.newaxis, :]) * np.sin(dt))
-            * inv_den,
-            axis=1,
-        )
-        d_p = np.sum(
-            (
-                np.cos(p[:, np.newaxis]) * np.sin(p[np.newaxis, :]) * np.cos(dt)
-                - np.sin(p[:, np.newaxis]) * np.cos(p[np.newaxis, :])
-            )
-            * inv_den,
-            axis=1,
-        )
-
-        return np.column_stack([d_t, d_p])
-
-    def calc_energy_state(self, pts: np.ndarray) -> np.double:
-        t = pts[:, 0]
-        p = pts[:, 1]
-        dt = t[:, np.newaxis] - t[np.newaxis, :]
-
-        dist_sq = (
-            2
-            - 2 * np.sin(p[:, np.newaxis]) * np.sin(p[np.newaxis, :]) * np.cos(dt)
-            - 2 * np.cos(p[:, np.newaxis]) * np.cos(p[np.newaxis, :])
-        )
-
-        # Set the distance to the same point (i) 0
-        np.fill_diagonal(dist_sq, 0)
-
-        # Only need the upper triangle of matrix so distances aren't counted duplicate
-        # Where i < j, dist_arr[i][j] is kept
-        upper = np.triu(np.sqrt(np.clip(dist_sq, 0, None)), k=1)
-        return np.sum(1.0 / upper[upper > 0])
-
-    def calc_dist_row(self, pts: np.ndarray, i: int):
-        t_i, p_i = pts[i, 0], pts[i, 1]
-        dt = t_i - pts[:, 0]
-
-        dist_sq = (
-            2
-            - 2 * np.sin(p_i) * np.sin(pts[:, 1]) * np.cos(dt)
-            - 2 * np.cos(p_i) * np.cos(pts[:, 1])
-        )
-
-        # Set the distance to the same point (i) 0
-        dist_sq[i] = 0
-
-        return np.sqrt(np.clip(dist_sq, 0, None))
-
-    def calc_grad_row(self, pts: np.ndarray, dist_row: np.ndarray, i: int):
-        t_i, p_i = pts[i, 0], pts[i, 1]
-        dt = t_i - pts[:, 0]
-        den = dist_row**3
-
-        with np.errstate(divide='ignore', invalid='ignore'):
-            inv_den = np.where(den > 0, 1.0 / den, 0.0)
-
-        d_t = np.sum(-np.sin(p_i) * np.sin(pts[:, 1]) * np.sin(dt) * inv_den)
-        d_p = np.sum(
-            (
-                np.cos(p_i) * np.sin(pts[:, 1]) * np.cos(dt)
-                - np.sin(p_i) * np.cos(pts[:, 1])
-            )
-            * inv_den
-        )
-
-        return np.array([d_t, d_p])
-
-    def paf(self, e: float, e_n: float, t: int) -> bool:
-        if e_n < e:
-            return True
-
-        return np.random.random() <= np.exp((e - e_n) / t)
 
     def _toggle_sphere(self, checked):
         if checked:
