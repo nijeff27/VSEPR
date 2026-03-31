@@ -69,7 +69,7 @@ def calc_grad_arr(pts: np.ndarray, bonded_points: int) -> np.ndarray:
     return np.column_stack([d_t, d_p])
 
 
-def calc_energy_state(pts: np.ndarray, bonded_points: int) -> np.double:
+def calc_energy_state(pts: np.ndarray, bonded_points: int) -> np.float32:
     # Only need the upper triangle of matrix so distances aren't counted duplicate
     # Where i < j, dist_arr[i][j] is kept
     dist = calc_dist_arr(pts)
@@ -493,12 +493,11 @@ class VSEPR:
             # Utilizing simulated annealing to work towards global minimum
             # See https://cp-algorithms.com/num_methods/simulated_annealing.html
             while temp > temp_min:
-                pts = self.points.copy()
-                grad = calc_grad_arr(pts, bonded_p)
+                grad = calc_grad_arr(self.points, bonded_p)
 
                 # We want to attempt to apply the negative gradient AND some noise (in around 1/5 of points) to the
                 # current configuration, then check if it will accept using the PAF (probability acceptance function).
-                next_pts = pts - STEP * grad
+                next_pts = self.points - STEP * grad
 
                 noise_i = np.random.choice(total_p, NOISE_AMT, replace=False)
                 noise = gen_points(NOISE_AMT)
@@ -557,9 +556,8 @@ class VSEPR:
             accepted = 0
 
             while temp > temp_min:
-                pts = self.points.copy()
-                grad = calc_grad_arr(pts, bonded_p)
-                next_pts = pts - STEP * grad
+                grad = calc_grad_arr(self.points, bonded_p)
+                next_pts = self.points - STEP * grad
                 next_e = calc_energy_state(next_pts, bonded_p)
 
                 if next_e < best_e:

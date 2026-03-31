@@ -1,0 +1,767 @@
+[
+    {
+        "bonded_points": 2,
+        "lone_points": 3,
+        "best_energy": 8.360772863023232
+    },
+    {
+        "bonded_points": 2,
+        "lone_points": 4,
+        "best_energy": 13.286212547686127
+    },
+    {
+        "bonded_points": 2,
+        "lone_points": 5,
+        "best_energy": 19.590619790335808
+    },
+    {
+        "bonded_points": 3,
+        "lone_points": 3,
+        "best_energy": 12.402230694027697
+    },
+    {
+        "bonded_points": 3,
+        "lone_points": 4,
+        "best_energy": 18.4709248279268
+    },
+    {
+        "bonded_points": 3,
+        "lone_points": 5,
+        "best_energy": 25.74130500458024
+    },
+    {
+        "bonded_points": 4,
+        "lone_points": 3,
+        "best_energy": 17.393563655169245
+    },
+    {
+        "bonded_points": 4,
+        "lone_points": 4,
+        "best_energy": 24.437517687315186
+    },
+    {
+        "bonded_points": 4,
+        "lone_points": 5,
+        "best_energy": 32.749307804679646
+    },
+    {
+        "bonded_points": 5,
+        "lone_points": 3,
+        "best_energy": 23.188776641846502
+    },
+    {
+        "bonded_points": 5,
+        "lone_points": 4,
+        "best_energy": 31.26919045112931
+    },
+    {
+        "bonded_points": 5,
+        "lone_points": 5,
+        "best_energy": 40.66250805537827
+    },
+    {
+        "bonded_points": 6,
+        "lone_points": 3,
+        "best_energy": 29.82796390871018
+    },
+    {
+        "bonded_points": 6,
+        "lone_points": 4,
+        "best_energy": 38.988078822319665
+    },
+    {
+        "bonded_points": 6,
+        "lone_points": 5,
+        "best_energy": 49.494150378434654
+    },
+    {
+        "bonded_points": 7,
+        "lone_points": 3,
+        "best_energy": 37.357106691047186
+    },
+    {
+        "bonded_points": 7,
+        "lone_points": 4,
+        "best_energy": 47.62526313873859
+    },
+    {
+        "bonded_points": 7,
+        "lone_points": 5,
+        "best_energy": 59.04500784783746
+    },
+    {
+        "bonded_points": 8,
+        "lone_points": 3,
+        "best_energy": 45.79891984037134
+    },
+    {
+        "bonded_points": 8,
+        "lone_points": 4,
+        "best_energy": 56.98466154851627
+    },
+    {
+        "bonded_points": 8,
+        "lone_points": 5,
+        "best_energy": 69.68221487987867
+    },
+    {
+        "bonded_points": 9,
+        "lone_points": 3,
+        "best_energy": 54.964578937112094
+    },
+    {
+        "bonded_points": 9,
+        "lone_points": 4,
+        "best_energy": 67.41966786476274
+    },
+    {
+        "bonded_points": 9,
+        "lone_points": 5,
+        "best_energy": 81.11853169668944
+    },
+    {
+        "bonded_points": 10,
+        "lone_points": 3,
+        "best_energy": 65.20485858948472
+    },
+    {
+        "bonded_points": 10,
+        "lone_points": 4,
+        "best_energy": 78.65621291602321
+    },
+    {
+        "bonded_points": 10,
+        "lone_points": 5,
+        "best_energy": 93.461328604311
+    },
+    {
+        "bonded_points": 11,
+        "lone_points": 3,
+        "best_energy": 76.23843240943162
+    },
+    {
+        "bonded_points": 11,
+        "lone_points": 4,
+        "best_energy": 90.79921071277494
+    },
+    {
+        "bonded_points": 11,
+        "lone_points": 5,
+        "best_energy": 106.67444749171807
+    },
+    {
+        "bonded_points": 12,
+        "lone_points": 3,
+        "best_energy": 88.18166219819437
+    },
+    {
+        "bonded_points": 12,
+        "lone_points": 4,
+        "best_energy": 103.83858189783231
+    },
+    {
+        "bonded_points": 12,
+        "lone_points": 5,
+        "best_energy": 120.8334096292929
+    },
+    {
+        "bonded_points": 13,
+        "lone_points": 3,
+        "best_energy": 101.04764028747027
+    },
+    {
+        "bonded_points": 13,
+        "lone_points": 4,
+        "best_energy": 117.7890000305608
+    },
+    {
+        "bonded_points": 13,
+        "lone_points": 5,
+        "best_energy": 135.89523706893556
+    },
+    {
+        "bonded_points": 14,
+        "lone_points": 3,
+        "best_energy": 114.79107270270052
+    },
+    {
+        "bonded_points": 14,
+        "lone_points": 4,
+        "best_energy": 132.63988744794878
+    },
+    {
+        "bonded_points": 14,
+        "lone_points": 5,
+        "best_energy": 151.87645171038628
+    },
+    {
+        "bonded_points": 15,
+        "lone_points": 3,
+        "best_energy": 129.4292762214419
+    },
+    {
+        "bonded_points": 15,
+        "lone_points": 4,
+        "best_energy": 148.42760299269
+    },
+    {
+        "bonded_points": 15,
+        "lone_points": 5,
+        "best_energy": 168.7074258666633
+    },
+    {
+        "bonded_points": 16,
+        "lone_points": 3,
+        "best_energy": 145.02300346734395
+    },
+    {
+        "bonded_points": 16,
+        "lone_points": 4,
+        "best_energy": 165.04947573113768
+    },
+    {
+        "bonded_points": 16,
+        "lone_points": 5,
+        "best_energy": 186.47195829777291
+    },
+    {
+        "bonded_points": 17,
+        "lone_points": 3,
+        "best_energy": 161.44139587302567
+    },
+    {
+        "bonded_points": 17,
+        "lone_points": 4,
+        "best_energy": 182.615789096526
+    },
+    {
+        "bonded_points": 17,
+        "lone_points": 5,
+        "best_energy": 205.15901327450766
+    },
+    {
+        "bonded_points": 18,
+        "lone_points": 3,
+        "best_energy": 178.79767555503477
+    },
+    {
+        "bonded_points": 18,
+        "lone_points": 4,
+        "best_energy": 201.09483546103593
+    },
+    {
+        "bonded_points": 18,
+        "lone_points": 5,
+        "best_energy": 224.80444584709352
+    },
+    {
+        "bonded_points": 19,
+        "lone_points": 3,
+        "best_energy": 197.07122696547117
+    },
+    {
+        "bonded_points": 19,
+        "lone_points": 4,
+        "best_energy": 220.53260669047378
+    },
+    {
+        "bonded_points": 19,
+        "lone_points": 5,
+        "best_energy": 245.27609740316387
+    },
+    {
+        "bonded_points": 20,
+        "lone_points": 3,
+        "best_energy": 216.31381346699638
+    },
+    {
+        "bonded_points": 20,
+        "lone_points": 4,
+        "best_energy": 240.79310741862344
+    },
+    {
+        "bonded_points": 20,
+        "lone_points": 5,
+        "best_energy": 266.7447587110512
+    },
+    {
+        "bonded_points": 21,
+        "lone_points": 3,
+        "best_energy": 236.36487812840673
+    },
+    {
+        "bonded_points": 21,
+        "lone_points": 4,
+        "best_energy": 262.06646335343277
+    },
+    {
+        "bonded_points": 21,
+        "lone_points": 5,
+        "best_energy": 289.0898664342076
+    },
+    {
+        "bonded_points": 22,
+        "lone_points": 3,
+        "best_energy": 257.4281292023129
+    },
+    {
+        "bonded_points": 22,
+        "lone_points": 4,
+        "best_energy": 284.2088024255587
+    },
+    {
+        "bonded_points": 22,
+        "lone_points": 5,
+        "best_energy": 312.3195183093833
+    },
+    {
+        "bonded_points": 23,
+        "lone_points": 3,
+        "best_energy": 279.36221275413243
+    },
+    {
+        "bonded_points": 23,
+        "lone_points": 4,
+        "best_energy": 307.222790558935
+    },
+    {
+        "bonded_points": 23,
+        "lone_points": 5,
+        "best_energy": 336.5326198473485
+    },
+    {
+        "bonded_points": 24,
+        "lone_points": 3,
+        "best_energy": 302.1732178458203
+    },
+    {
+        "bonded_points": 24,
+        "lone_points": 4,
+        "best_energy": 331.2271255312615
+    },
+    {
+        "bonded_points": 24,
+        "lone_points": 5,
+        "best_energy": 361.6967269021431
+    },
+    {
+        "bonded_points": 25,
+        "lone_points": 3,
+        "best_energy": 325.9735663121004
+    },
+    {
+        "bonded_points": 25,
+        "lone_points": 4,
+        "best_energy": 356.1841739666071
+    },
+    {
+        "bonded_points": 25,
+        "lone_points": 5,
+        "best_energy": 387.7190022445186
+    },
+    {
+        "bonded_points": 26,
+        "lone_points": 3,
+        "best_energy": 350.72883063173816
+    },
+    {
+        "bonded_points": 26,
+        "lone_points": 4,
+        "best_energy": 381.9987431584544
+    },
+    {
+        "bonded_points": 26,
+        "lone_points": 5,
+        "best_energy": 414.6926249481715
+    },
+    {
+        "bonded_points": 27,
+        "lone_points": 3,
+        "best_energy": 376.33502936267445
+    },
+    {
+        "bonded_points": 27,
+        "lone_points": 4,
+        "best_energy": 408.76759026347986
+    },
+    {
+        "bonded_points": 27,
+        "lone_points": 5,
+        "best_energy": 442.4968100300178
+    },
+    {
+        "bonded_points": 28,
+        "lone_points": 3,
+        "best_energy": 402.8772240845101
+    },
+    {
+        "bonded_points": 28,
+        "lone_points": 4,
+        "best_energy": 436.34921029140423
+    },
+    {
+        "bonded_points": 28,
+        "lone_points": 5,
+        "best_energy": 471.4277527734565
+    },
+    {
+        "bonded_points": 29,
+        "lone_points": 3,
+        "best_energy": 430.2549830470015
+    },
+    {
+        "bonded_points": 29,
+        "lone_points": 4,
+        "best_energy": 465.0856223809741
+    },
+    {
+        "bonded_points": 29,
+        "lone_points": 5,
+        "best_energy": 501.17197767901405
+    },
+    {
+        "bonded_points": 30,
+        "lone_points": 3,
+        "best_energy": 458.7842028958456
+    },
+    {
+        "bonded_points": 30,
+        "lone_points": 4,
+        "best_energy": 494.6188172106057
+    },
+    {
+        "bonded_points": 30,
+        "lone_points": 5,
+        "best_energy": 531.8967204502046
+    },
+    {
+        "bonded_points": 31,
+        "lone_points": 3,
+        "best_energy": 488.1206787569045
+    },
+    {
+        "bonded_points": 31,
+        "lone_points": 4,
+        "best_energy": 525.1224062731486
+    },
+    {
+        "bonded_points": 31,
+        "lone_points": 5,
+        "best_energy": 563.5073894124363
+    },
+    {
+        "bonded_points": 32,
+        "lone_points": 3,
+        "best_energy": 518.4040908789285
+    },
+    {
+        "bonded_points": 32,
+        "lone_points": 4,
+        "best_energy": 556.5178404407208
+    },
+    {
+        "bonded_points": 32,
+        "lone_points": 5,
+        "best_energy": 596.0487491097072
+    },
+    {
+        "bonded_points": 33,
+        "lone_points": 3,
+        "best_energy": 549.5964957120597
+    },
+    {
+        "bonded_points": 33,
+        "lone_points": 4,
+        "best_energy": 588.8636625495382
+    },
+    {
+        "bonded_points": 33,
+        "lone_points": 5,
+        "best_energy": 629.5435052219414
+    },
+    {
+        "bonded_points": 34,
+        "lone_points": 3,
+        "best_energy": 581.7377134705749
+    },
+    {
+        "bonded_points": 34,
+        "lone_points": 4,
+        "best_energy": 622.1264522823443
+    },
+    {
+        "bonded_points": 34,
+        "lone_points": 5,
+        "best_energy": 663.9424975019543
+    },
+    {
+        "bonded_points": 35,
+        "lone_points": 3,
+        "best_energy": 614.7722008590586
+    },
+    {
+        "bonded_points": 35,
+        "lone_points": 4,
+        "best_energy": 656.335468855999
+    },
+    {
+        "bonded_points": 35,
+        "lone_points": 5,
+        "best_energy": 699.2951407879347
+    },
+    {
+        "bonded_points": 36,
+        "lone_points": 3,
+        "best_energy": 648.7759331891466
+    },
+    {
+        "bonded_points": 36,
+        "lone_points": 4,
+        "best_energy": 691.4740617327457
+    },
+    {
+        "bonded_points": 36,
+        "lone_points": 5,
+        "best_energy": 735.5899138184734
+    },
+    {
+        "bonded_points": 37,
+        "lone_points": 3,
+        "best_energy": 683.7037977763184
+    },
+    {
+        "bonded_points": 37,
+        "lone_points": 4,
+        "best_energy": 727.568128247403
+    },
+    {
+        "bonded_points": 37,
+        "lone_points": 5,
+        "best_energy": 772.8123995771923
+    },
+    {
+        "bonded_points": 38,
+        "lone_points": 3,
+        "best_energy": 719.5767104616011
+    },
+    {
+        "bonded_points": 38,
+        "lone_points": 4,
+        "best_energy": 764.5699192520742
+    },
+    {
+        "bonded_points": 38,
+        "lone_points": 5,
+        "best_energy": 810.9781111579653
+    },
+    {
+        "bonded_points": 39,
+        "lone_points": 3,
+        "best_energy": 756.3713159427989
+    },
+    {
+        "bonded_points": 39,
+        "lone_points": 4,
+        "best_energy": 802.5250135440497
+    },
+    {
+        "bonded_points": 39,
+        "lone_points": 5,
+        "best_energy": 850.0323503496858
+    },
+    {
+        "bonded_points": 40,
+        "lone_points": 3,
+        "best_energy": 794.1182430395108
+    },
+    {
+        "bonded_points": 40,
+        "lone_points": 4,
+        "best_energy": 841.3581573518162
+    },
+    {
+        "bonded_points": 40,
+        "lone_points": 5,
+        "best_energy": 890.1012377556103
+    },
+    {
+        "bonded_points": 41,
+        "lone_points": 3,
+        "best_energy": 832.7374293216244
+    },
+    {
+        "bonded_points": 41,
+        "lone_points": 4,
+        "best_energy": 881.2308838670423
+    },
+    {
+        "bonded_points": 41,
+        "lone_points": 5,
+        "best_energy": 931.149353553368
+    },
+    {
+        "bonded_points": 42,
+        "lone_points": 3,
+        "best_energy": 872.3903956854338
+    },
+    {
+        "bonded_points": 42,
+        "lone_points": 4,
+        "best_energy": 922.0521077829488
+    },
+    {
+        "bonded_points": 42,
+        "lone_points": 5,
+        "best_energy": 973.0831248450081
+    },
+    {
+        "bonded_points": 43,
+        "lone_points": 3,
+        "best_energy": 913.0005670807356
+    },
+    {
+        "bonded_points": 43,
+        "lone_points": 4,
+        "best_energy": 963.7855558437265
+    },
+    {
+        "bonded_points": 43,
+        "lone_points": 5,
+        "best_energy": 1015.8428125653754
+    },
+    {
+        "bonded_points": 44,
+        "lone_points": 3,
+        "best_energy": 954.517859219289
+    },
+    {
+        "bonded_points": 44,
+        "lone_points": 4,
+        "best_energy": 1006.3125778562567
+    },
+    {
+        "bonded_points": 44,
+        "lone_points": 5,
+        "best_energy": 1059.7238164299606
+    },
+    {
+        "bonded_points": 45,
+        "lone_points": 3,
+        "best_energy": 996.8426076028484
+    },
+    {
+        "bonded_points": 45,
+        "lone_points": 4,
+        "best_energy": 1049.9934520329687
+    },
+    {
+        "bonded_points": 45,
+        "lone_points": 5,
+        "best_energy": 1104.420563884085
+    },
+    {
+        "bonded_points": 46,
+        "lone_points": 3,
+        "best_energy": 1040.3133989971745
+    },
+    {
+        "bonded_points": 46,
+        "lone_points": 4,
+        "best_energy": 1094.4753547933487
+    },
+    {
+        "bonded_points": 46,
+        "lone_points": 5,
+        "best_energy": 1150.1129387313695
+    },
+    {
+        "bonded_points": 47,
+        "lone_points": 3,
+        "best_energy": 1084.5790275470254
+    },
+    {
+        "bonded_points": 47,
+        "lone_points": 4,
+        "best_energy": 1139.9544192137182
+    },
+    {
+        "bonded_points": 47,
+        "lone_points": 5,
+        "best_energy": 1196.7912931329313
+    },
+    {
+        "bonded_points": 48,
+        "lone_points": 3,
+        "best_energy": 1129.8442810596139
+    },
+    {
+        "bonded_points": 48,
+        "lone_points": 4,
+        "best_energy": 1186.4243439353434
+    },
+    {
+        "bonded_points": 48,
+        "lone_points": 5,
+        "best_energy": 1244.368279945855
+    },
+    {
+        "bonded_points": 49,
+        "lone_points": 3,
+        "best_energy": 1176.089411353073
+    },
+    {
+        "bonded_points": 49,
+        "lone_points": 4,
+        "best_energy": 1233.7709719779546
+    },
+    {
+        "bonded_points": 49,
+        "lone_points": 5,
+        "best_energy": 1292.874523975513
+    },
+    {
+        "bonded_points": 50,
+        "lone_points": 3,
+        "best_energy": 1223.2269887736022
+    },
+    {
+        "bonded_points": 50,
+        "lone_points": 4,
+        "best_energy": 1282.081953418659
+    },
+    {
+        "bonded_points": 50,
+        "lone_points": 5,
+        "best_energy": 1342.377612592183
+    },
+    {
+        "bonded_points": 0,
+        "lone_points": 3,
+        "best_energy": 2.6314014181686076
+    },
+    {
+        "bonded_points": 0,
+        "lone_points": 4,
+        "best_energy": 5.58204536043276
+    },
+    {
+        "bonded_points": 0,
+        "lone_points": 5,
+        "best_energy": 9.836612359680522
+    },
+    {
+        "bonded_points": 1,
+        "lone_points": 3,
+        "best_energy": 5.051613354894024
+    },
+    {
+        "bonded_points": 1,
+        "lone_points": 4,
+        "best_energy": 9.078568925762756
+    },
+    {
+        "bonded_points": 1,
+        "lone_points": 5,
+        "best_energy": 14.208840417473532
+    }
+]

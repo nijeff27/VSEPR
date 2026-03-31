@@ -2,19 +2,21 @@
 Command-line interface for generating VSEPR configurations. Uses little GPU and can run multiple processes at once.
 """
 
+import argparse
 import json
+import os
 import time
 from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
 
-RNG = np.random.default_rng()
 LONE_CONSTANT = 1.23257467
 
 
 def gen_points(amt: int):
+    rng = np.random.default_rng()
     # Generate points in rectangular coordinates to prevent point clustering caused by spherical coordinates
-    pts_rect = RNG.uniform(-1.0, 1.0, (amt, 3))
+    pts_rect = rng.uniform(-1.0, 1.0, (amt, 3))
     pts_rect = pts_rect / np.linalg.norm(pts_rect, axis=1, keepdims=True)
 
     # Now convert those coordinates to spherical coordinates (theta, phi)
@@ -27,7 +29,7 @@ def gen_points(amt: int):
 def find_points(
     bonded_p: int,
     lone_p: int,
-    temp: float,
+    temp: np.float64,
     temp_min=0.00001,
     decay=0.999,
     bonded_points_arr: np.ndarray = None,
@@ -42,8 +44,9 @@ def find_points(
     NOISE_AMP = 0.1 / np.sqrt(total_p)
     NOISE_AMT = (total_p // 5) + 1
 
-    temp_i = temp * np.sqrt(total_p)
-    best_e = float('inf')
+    temp_i = temp * total_p
+    temp = temp_i
+    best_e = np.float64('inf')
     best_pts: np.ndarray = points.copy()
     curr_e = calc_energy_state(points, bonded_p)
     total_steps = 0
@@ -124,7 +127,7 @@ def find_points(
                 STEP *= 0.9
 
             # But step can't be too high or low...
-            STEP = np.clip(STEP, 1e-5 / np.sqrt(total_p), 0.5 / np.sqrt(total_p))
+            STEP = np.clip(STEP, 1e-7 / np.sqrt(total_p), 0.5 / np.sqrt(total_p))
             accepted = 0
 
     # Phase R
@@ -178,7 +181,7 @@ def find_points(
                 STEP *= 0.9
 
             # But step can't be too high or low...
-            STEP = np.clip(STEP, 1e-5 / np.sqrt(total_p), 0.5 / np.sqrt(total_p))
+            STEP = np.clip(STEP, 1e-7 / np.sqrt(total_p), 0.5 / np.sqrt(total_p))
             accepted = 0
 
     total_steps += steps
@@ -189,7 +192,9 @@ def find_points(
     return (best_e, points)
 
 
-def run(bonded_p: int, lone_p: int, temp: float, decay: float, runs: int = 10):
+def run(
+    bonded_p: int, lone_p: int, temp: np.float64, decay: np.float64, runs: int = 10
+):
     with ProcessPoolExecutor(max_workers=runs) as executor:
         procs = [
             executor.submit(find_points, bonded_p, lone_p, temp, decay=decay)
@@ -212,7 +217,11 @@ def run(bonded_p: int, lone_p: int, temp: float, decay: float, runs: int = 10):
         ],
     }
 
-    filename = 'data/result_vsepr_cli.json'
+    filename = 'data/results_vsepr_cli.json'
+
+    if not os.path.exists(filename):
+        with open(filename, 'w') as f:
+            json.dump([], f)
     with open(filename, 'r+') as f:
         data = json.load(f)
         data.append(output)
@@ -267,16 +276,16 @@ def calc_grad_arr(pts: np.ndarray, bonded_points: int) -> np.ndarray:
 
 
 def calc_energy_state(pts: np.ndarray, bonded_points: int) -> np.double:
+    dist_arr = calc_dist_arr(pts)
     # Only need the upper triangle of matrix so distances aren't counted duplicate
     # Where i < j, dist_arr[i][j] is kept
-    dist = calc_dist_arr(pts)
     weight = weights(pts, bonded_points)
-    upper_mask = np.triu(dist > 0, k=1)
+    upper_mask = np.triu(dist_arr > 0, k=1)
 
     # Divide the upper array by the lone pair energy constants (if there are lone pairs)
     # Since the reciprocal of this value will be taken, it will essentially be "multiplied"
 
-    return np.sum(weight[upper_mask] / dist[upper_mask])
+    return np.sum(weight[upper_mask] / dist_arr[upper_mask])
 
 
 def calc_dist_row(pts: np.ndarray, i: int):
@@ -335,7 +344,7 @@ def weights_row(bonded_points: int, total: int, i: int) -> np.ndarray:
     return weight
 
 
-def paf(e: float, e_n: float, t: int) -> bool:
+def paf(e: np.float64, e_n: np.float64, t: int) -> bool:
     if e_n < e:
         return True
 
@@ -343,23 +352,20 @@ def paf(e: float, e_n: float, t: int) -> bool:
 
 
 if __name__ == '__main__':
-    # parser = argparse.ArgumentParser(
-    #     prog='VSEPR_cli', description='Calculates values for VSEPR configurations.'
-    # )
-    # parser.add_argument('bonded', type=int, help='Number of bonded points')
-    # parser.add_argument('lone', type=int, help='Number of lone points')
-    # parser.add_argument(
-    #     '--temp', type=float, default=10000, help='Initial temperature [default: 10000]'
-    # )
-    # parser.add_argument(
-    #     '--decay', type=float, default=0.999, help='Decay [default: 0.999]'
-    # )
+    parser = argparse.ArgumentParser(
+        prog='VSEPR_cli', description='Calculates values for VSEPR configurations.'
+    )
+    parser.add_argument('bonded', type=int, help='Number of bonded points')
+    parser.add_argument('lone', type=int, help='Number of lone points')
+    parser.add_argument(
+        '--temp', type=float, default=10000, help='Initial temperature [default: 10000]'
+    )
+    parser.add_argument(
+        '--decay', type=float, default=0.999, help='Decay [default: 0.999]'
+    )
+    parser.add_argument(
+        '--runs', type=int, default=10, help='Number of Runs to Execute [default: 10]'
+    )
 
-    # args = parser.parse_args()
-    # run(args.bonded, args.lone, args.temp)
-
-    for i in range(2, 50):
-        run(i, 0, temp=10000, decay=0.999)
-
-    for i in range(3, 50):
-        run(i - 2, 2, temp=10000, decay=0.999)
+    args = parser.parse_args()
+    run(args.bonded, args.lone, args.temp, args.decay, args.runs)

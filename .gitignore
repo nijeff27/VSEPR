@@ -1,3 +1,5 @@
 .venv
 .vscode
 *.xlsx
+paper/*
+!paper/paper.pdf
